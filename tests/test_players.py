@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 """What a user meets (developer-guide.md section 4.4): Kinora plays H.265 at the film's rate through rpivid.codec,
-the library's example player VCPlay plays it in a window, and the stack's archive, installed by its own Installer,
+the library's example player VCPlay plays it in a window, and Kinora's archive, installed by its own Installer,
 puts the backend in place on a machine without it."""
 import re
 import time
@@ -8,9 +8,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from vchiqtest.suite import RESIDENT
+from videocodectest.suite import RESIDENT
 from emu68test.results import expect
-from vchiqtest.tools import backend, status, vctest
+from videocodectest.tools import backend, status, vctest
 
 # -- Kinora
 
@@ -150,31 +150,31 @@ def test_example_player_h265(device, material):
 
 INSTALLER = "SYS:System/Installer"
 PACKAGE = "RAM:hw/pkg"
-WINDOW = f"{PACKAGE}/Install"  # the Installer's window carries its script's path, a state after it
 INSTALL_LOG = "RAM:hw/install.log"
-KEPT = "RAM:hw/kept"
-# What installing videocodec alone may copy: the backend, the rest of videocodec and the gic400.library it needs
-WITH_VIDEOCODEC = {"LIBS/gic400.library", "LIBS/videocodec.library", "LIBS/videocodec/videocore.codec",
-                   "LIBS/videocodec/rpivid.codec", "DEVS/vchiq.device", "C/VCInfo", "Tools/Commodities/VCGrab",
-                   "Tools/Commodities/VCGrab.info"}
-# Of those, what the suite does not install itself: kept before the Installer runs and put back after it, so the
-# machine stays as the suite found it (Emu68's own gic400.library is the one in use)
-OUTSIDE_SUITE = ("LIBS:gic400.library",)
+# What installing the video libraries alone may copy: the library, its codec drivers and VCInfo
+WITH_VIDEO = {"LIBS/videocodec.library", "LIBS/videocodec/videocore.codec", "LIBS/videocodec/rpivid.codec", "C/VCInfo"}
 PAGES_MAX = 20
 
 
 def archive_of(request) -> Path:
-    """The archive to install: --archive, or the newest .lha the package target left in the build dir."""
+    """The archive to install: --archive, or the newest Kinora .lha the package target left in Kinora's build dir
+    (the parent of this repository's)."""
     chosen = request.config.getoption("--archive")
     if chosen:
         return Path(chosen)
-    found = sorted(Path(request.config.getoption("--build-dir"), "package").glob("*.lha"), key=lambda p: p.stat().st_mtime)
+    found = sorted(Path(request.config.getoption("--build-dir")).parent.joinpath("package").glob("Kinora-*.lha"),
+                   key=lambda p: p.stat().st_mtime)
     if not found:
-        pytest.skip("no archive: build the package target, or give --archive")
+        pytest.skip("no archive: build Kinora's package target, or give --archive")
     return found[-1]
 
 
-def installer_page(device):
+def window_of(archive: Path) -> str:
+    """The Installer's window title's start: its script's path in the archive's drawer, which unpacks into PACKAGE."""
+    return f"{PACKAGE}/{archive.stem}/Install"
+
+
+def installer_page(device, window: str):
     """The Installer's window: (bounds, title, {gadget id: (kind, selected)}), or None once it has closed."""
     page, gadgets = None, {}
     for line in device.ami.ui_tree().splitlines():
@@ -182,7 +182,7 @@ def installer_page(device):
         if w:
             if page is not None:
                 break
-            if w.group(5).startswith(WINDOW):
+            if w.group(5).startswith(window):
                 page = (tuple(int(w.group(i)) for i in range(1, 5)), w.group(5))
             continue
         g = re.match(r"G\s+(\d+)\s+-?\d+\s+-?\d+\s+(\d+)x(\d+)\s+button\s+(\S+)", line)
@@ -192,11 +192,11 @@ def installer_page(device):
     return None if page is None else (page[0], page[1], gadgets)
 
 
-def next_page(device, before: int | None, timeout: float = 120):
+def next_page(device, window: str, before: int | None, timeout: float = 120):
     """The Installer's next page once it shows and holds still (@before: the last page's region hash), or None."""
     t0, last, still = time.time(), None, 0
     while time.time() - t0 < timeout:
-        page = installer_page(device)
+        page = installer_page(device, window)
         if page is None:
             return None
         bounds, title, _ = page
@@ -213,36 +213,30 @@ def next_page(device, before: int | None, timeout: float = 120):
 
 
 def answer(gadgets: dict) -> tuple[str, list[int]]:
-    """What to click on a page, told by its gadgets: everything left out but videocodec."""
+    """What to click on a page, told by its gadgets: everything left out but the video libraries."""
     radios = sorted(i for i, (kind, _) in gadgets.items() if kind == "radio")
     checks = sorted(i for i, (kind, _) in gadgets.items() if kind == "check")
     if radios[:1] == [1]:
         return "the Installer's own: install for real, log to a file", [1, 4]
-    if len(checks) == 2:
-        return "USB host-controller drivers: none", [i for i in checks if gadgets[i][1]]
-    if len(radios) == 3:
-        return "Ethernet driver: none", [radios[-1]]
-    if len(radios) == 2:
-        return "TCP/IP stack: leave bsdsocket.library alone", [radios[-1]]
-    if len(checks) == 7:  # gic400, bcmpcie, openpci, nvme, videocodec, videocore.audio, vcjpeg
-        want = {checks[4]}
-        return "other components: videocodec only", [i for i in checks if gadgets[i][1] != (i in want)]
+    if len(checks) == 5:  # Kinora, the video libraries, vcjpeg.datatype, VCGrab, DMXInfo and ACInfo
+        want = {checks[1]}
+        return "what to install: the video libraries only", [i for i in checks if gadgets[i][1] != (i in want)]
     if not radios and not checks:
         return "a message", []
     raise AssertionError(f"an Installer page this test does not know: {gadgets}")
 
 
-def run_installer(device) -> list[str]:
-    """The archive's Install script in EXPERT mode with only videocodec ticked, driven page by page."""
+def run_installer(device, window: str) -> list[str]:
+    """The archive's Install script in EXPERT mode with only the video libraries ticked, driven page by page."""
     device.upload_bytes("RAM:hw/install.s", (
-        f"CD {PACKAGE}\n"
-        f'Run >NIL: {INSTALLER} SCRIPT {WINDOW} APPNAME "emu68 Driver Stack" MINUSER EXPERT DEFUSER EXPERT '
+        f"CD {window.rsplit('/', 1)[0]}\n"
+        f'Run >NIL: {INSTALLER} SCRIPT {window} APPNAME "Kinora" MINUSER EXPERT DEFUSER EXPERT '
         f"LOGFILE {INSTALL_LOG}\n").encode())
     device.wake()
     device.exec("Execute RAM:hw/install.s", timeout=20)
     seen, before = [], None
     for n in range(PAGES_MAX):
-        page = next_page(device, before)
+        page = next_page(device, window, before)
         if page is None:
             return seen
         bounds, _, gadgets = page
@@ -250,51 +244,47 @@ def run_installer(device) -> list[str]:
         seen.append(what)
         device.screenshot(bounds, name=f"installer-{n:02d}")
         for gadget in clicks:
-            device.ami.ui_click(str(gadget), WINDOW)
+            device.ami.ui_click(str(gadget), window)
         before = device.ami.region_hash(*bounds)
-        device.ami.ui_click("90", WINDOW)  # Proceed
+        device.ami.ui_click("90", window)  # Proceed
     raise AssertionError(f"the Installer still runs after {PAGES_MAX} pages: {seen}")
 
 
 @pytest.mark.reboot
 def test_install(request, device, material, record_property):
-    """The stack's archive installed by its Installer, videocodec ticked, on a machine without rpivid.codec: the
-    backend copied, and after a reboot listed with its codec and decoding bit exact."""
+    """Kinora's archive installed by its Installer, the video libraries alone ticked, on a machine without
+    rpivid.codec: the backend copied, and after a reboot listed with its codec and decoding bit exact."""
     rc, _ = device.exec("Which >NIL: LhA", timeout=15)
     if rc != 0:
         pytest.skip("no LhA on the Amiga to unpack the archive with")
     archive = archive_of(request)
-    device.upload_once(archive, "RAM:hw/stack.lha")
+    window = window_of(archive)
+    drawer = window.rsplit("/", 1)[0]
+    device.upload_once(archive, "RAM:hw/kinora.lha")
     device.exec(f"Delete >NIL: {PACKAGE} ALL QUIET", timeout=30)
-    rc, text = device.exec(f"LhA >NIL: -q x RAM:hw/stack.lha {PACKAGE}/", timeout=120)
+    rc, text = device.exec(f"LhA >NIL: -q x RAM:hw/kinora.lha {PACKAGE}/", timeout=120)
     assert rc == 0, f"LhA: {text}"
     # the files the suites install that the Installer would copy: the archive's must be the install tree's, or the
     # Installer would put an older build over the one under test
     install_dir = Path(request.config.getoption("--install-dir"))
     stale = [local for local, _ in RESIDENT
-             if local in WITH_VIDEOCODEC and device.download(f"{PACKAGE}/{local}") != (install_dir / local).read_bytes()]
+             if local in WITH_VIDEO and device.download(f"{drawer}/{local}") != (install_dir / local).read_bytes()]
     assert not stale, f"{archive.name} is not of the installed build ({', '.join(stale)}): build the package target"
     ours = (install_dir / "LIBS/videocodec/rpivid.codec").read_bytes()
 
-    device.exec(f"MakeDir >NIL: {KEPT}", timeout=10)
-    for path in OUTSIDE_SUITE:
-        device.exec(f"Copy >NIL: {path} {KEPT}/ CLONE", timeout=20)
     device.exec(f"Delete >NIL: {INSTALL_LOG} QUIET", timeout=10)
     rc, _ = device.exec("Delete >NIL: LIBS:videocodec/rpivid.codec", timeout=10)
     assert rc == 0, "rpivid.codec was not there to take away"
-    try:
-        pages = run_installer(device)
-    finally:
-        for path in OUTSIDE_SUITE:
-            device.exec(f"Copy >NIL: {KEPT}/{Path(path.split(':', 1)[1]).name} {path} CLONE", timeout=20)
+    pages = run_installer(device, window)
     record_property("pages", "; ".join(pages))
     log = device.download_text(INSTALL_LOG)
     device.keep("install.log", log)
     assert "Pretend: No" in log, "the Installer only pretended"
-    copied = {src for src, _ in re.findall(r'Copy file "([^"]+)" to "([^"]+)"', log)}
+    # the script names its files by the archive's drawer: what lies under it, as the archive holds it
+    copied = {src.split(f"{archive.stem}/", 1)[-1] for src, _ in re.findall(r'Copy file "([^"]+)" to "([^"]+)"', log)}
     record_property("copied", ", ".join(sorted(copied)))
     assert "LIBS/videocodec/rpivid.codec" in copied, "the Installer did not copy rpivid.codec"
-    assert copied <= WITH_VIDEOCODEC, f"copied beyond videocodec: {sorted(copied - WITH_VIDEOCODEC)}"
+    assert copied <= WITH_VIDEO, f"copied beyond the video libraries: {sorted(copied - WITH_VIDEO)}"
     assert device.download("LIBS:videocodec/rpivid.codec") == ours
 
     time.sleep(20)  # PFS3 writes late: a reboot right after a copy can lose it

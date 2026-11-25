@@ -7,10 +7,10 @@ import time
 
 import numpy as np
 import pytest
-from vchiqtest.material import ffmpeg
-from vchiqtest.pictures import best_psnr, judge_bars, pattern, ref_rgb, rgb565_pixels
+from videocodectest.material import ffmpeg
+from videocodectest.pictures import best_psnr, judge_bars, pattern, ref_rgb, rgb565_pixels
 from emu68test.results import parse
-from vchiqtest.tools import assert_nothing_left, backend, status, vctest
+from videocodectest.tools import assert_nothing_left, backend, status, vctest
 
 NATIVE = "OUTFORMAT NV12_COL128"
 EXECUTIVE_STAT = "SYS:Utilities/EXPANSION/Executive/Stat"  # AmiKit's scheduler (CLAUDE.md: what it does to timings)

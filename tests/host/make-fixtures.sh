@@ -27,7 +27,7 @@ set -euo pipefail
 HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 TOP=$(cd -- "$HERE/../.." && pwd)
 FIX="$TOP/tests/fixtures"
-SOURCE=${SOURCE:-"$TOP/../emu68-vchiq-library/tests/.cache/source/sample-mp4-1080p-h264-10s.mp4"}
+SOURCE=${SOURCE:-"$TOP/../videocodec-library/tests/.cache/source/sample-mp4-1080p-h264-10s.mp4"}
 [ -f "$SOURCE" ] || { echo "no source video at $SOURCE (the vchiq suite's material.py fetches it)" >&2; exit 1; }
 mkdir -p "$FIX"
 cd "$FIX"
@@ -95,10 +95,10 @@ bars() {
 	local name=$1 range=$2
 	[ -s "$name.h265" ] && return 0
 	echo "encoding $name"
-	python3 - "$TOP/../emu68-vchiq-library/tests" <<'PATTERN' |
+	python3 - "$TOP/../videocodec-library/tests" <<'PATTERN' |
 import sys
 sys.path.insert(0, sys.argv[1])
-from vchiqtest.pictures import pattern
+from videocodectest.pictures import pattern
 sys.stdout.buffer.write(pattern(1280, 720)[0].tobytes() * 5)
 PATTERN
 	ffmpeg -nostdin -v error -y -f rawvideo -pix_fmt rgb24 -s 1280x720 -r 25 -i - \

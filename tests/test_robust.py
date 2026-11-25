@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from vchiqtest.tools import assert_nothing_left, backend, held, status, vctest
+from videocodectest.tools import assert_nothing_left, backend, held, status, vctest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "host"))
 import broken  # noqa: E402  (tests/host/broken.py: the damaged streams' model, shared with break-fixtures.py)
