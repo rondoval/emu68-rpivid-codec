@@ -1,0 +1,27 @@
+The command generator's origin.
+
+src/cmdgen/ draws on Raspberry Pi's HEVC driver for Linux,
+https://github.com/raspberrypi/linux:
+
+    commit  0300b89d1a24c976c446a07c19a42b90253405af (rpi-7.2.y)
+    dir     drivers/media/platform/raspberrypi/hevc_dec/
+
+The files it draws on, each with its blob at that commit and the commit of
+its last change:
+
+    hevc_d_h265.c   e505b52c597f26da2f104c601c6e24af535fdf20   78572a934bbb726f527975b32937111acf5e7f76
+    hevc_d.h        5729b04475871d39273de9bf30c5e5b17697f6da   9a0d6be0bb69c6dbd15a51c7ca249f121ec86359
+    hevc_d_hw.h     765b27ab161badbdb2c007448bcf8075e73f94ad   ae7ff13d6e91dcdf3bc08058c4b3906bdb4e7adf
+    hevc_d_video.c  8eb5e268ebb62da1428f12df5bb76ae04d080990   9a0d6be0bb69c6dbd15a51c7ca249f121ec86359
+    hevc_d_video.h  b0e4b2762b8e146bed3d2470aba4442be4a7ad5b   9a0d6be0bb69c6dbd15a51c7ca249f121ec86359
+
+What each became here (NOTICE section 1 has the copyrights and licences):
+
+    hevc_d_h265.c   hevc_d_h265.c, the command generator: the hardware's functions kept
+                    byte for byte, the V4L2 framework's replaced (docs/architecture.md section 7),
+                    every other change marked "rpivid:"; cmdgen.c keeps a few more of its
+                    blocks, each marked
+    hevc_d.h        hevc_d.h: the structure names and limits the kept functions see
+    hevc_d_hw.h     hevc_d_hw.h: the register map
+    hevc_d_video.c  hevc_d_video.h and cmdgen.c: the buffer size formulas
+    hevc_d_video.h

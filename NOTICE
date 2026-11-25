@@ -1,0 +1,96 @@
+emu68-rpivid-codec - notices
+============================
+
+rpivid.codec is licensed under the GNU General Public License, version 2
+only (LICENSE). It contains code from the works below; each part keeps its
+own copyright, and the per-file SPDX headers are authoritative.
+
+
+1. Raspberry Pi's HEVC driver for Linux
+---------------------------------------
+
+drivers/media/platform/raspberrypi/hevc_dec/ of the Raspberry Pi Linux
+kernel, https://github.com/raspberrypi/linux, branch rpi-7.2.y, commit
+0300b89d1a24 (src/cmdgen/UPSTREAM gives each file's blob).
+
+    Copyright (C) 2025 Raspberry Pi Ltd
+
+    Based on the Cedrus VPU driver, that is:
+
+    Copyright (C) 2016 Florent Revest <florent.revest@free-electrons.com>
+    Copyright (C) 2018 Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+    Copyright (C) 2018 Bootlin
+
+What of it is here:
+
+- hevc_d_h265.c (GPL-2.0-or-later): the command generator,
+  src/cmdgen/hevc_d_h265.c, with the V4L2 framework's functions replaced
+  and every other change marked "rpivid:". src/cmdgen/UPSTREAM names the
+  original (commit and blob).
+- hevc_d_hw.h (GPL-2.0): the register map, src/cmdgen/hevc_d_hw.h.
+- hevc_d.h and hevc_d_video.h/.c (GPL-2.0): the structure names and limits
+  the kept functions see, and the buffer size formulas, in
+  src/cmdgen/hevc_d.h, src/cmdgen/hevc_d_video.h and src/cmdgen/cmdgen.c;
+  cmdgen.c also keeps a few blocks of hevc_d_h265.c, each marked.
+
+
+2. Linux's stateless HEVC controls (V4L2)
+-----------------------------------------
+
+include/uapi/linux/v4l2-controls.h of the same tree, licensed
+"(GPL-2.0+ WITH Linux-syscall-note) OR BSD-3-Clause". Its HEVC part is
+include/v4l2_hevc_ctrls.h, the picture record, taken under the BSD-3-Clause
+option:
+
+    Copyright (C) 1999-2012 the contributors
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+
+    1. Redistributions of source code must retain the above copyright
+       notice, this list of conditions and the following disclaimer.
+
+    2. Redistributions in binary form must reproduce the above copyright
+       notice, this list of conditions and the following disclaimer in the
+       documentation and/or other materials provided with the distribution.
+
+    3. Neither the name of the copyright holder nor the names of its
+       contributors may be used to endorse or promote products derived from
+       this software without specific prior written permission.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+    TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+    PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER
+    OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+    EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+    PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+    PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+    LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+    NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+3. The driver stack's own parts
+-------------------------------
+
+Each ships its LICENSE in the archive's Documentation/<name>/ drawer.
+
+- emu68-common (MPL-2.0 OR GPL-2.0-or-later): helpers, DMA memory, cache
+  operations, the driver task and the reset guard, linked into every
+  binary.
+- emu68-gic400-library (MPL-2.0 OR GPL-2.0-or-later): gic400.library's
+  interface, through which the interrupt is served.
+- emu68-vchiq-library (BSD-3-Clause): the backend interface of
+  videocodec.library that rpivid.codec implements.
+
+
+4. Used to build and test, in no binary
+---------------------------------------
+
+- FFmpeg (LGPL-2.1-or-later): the reference decoder on the host; the
+  conformance references in tests/conformance/ are FFmpeg 5.1's.
+- The HEVC conformance bitstreams (JCT-VC's HEVC_v1 set, from the ITU's
+  site), fetched by tests/host/fetch-conformance.sh; never part of the
+  repository, only the checksums of their decoded pictures are.

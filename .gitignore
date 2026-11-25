@@ -1,0 +1,10 @@
+build/
+install/
+TODO.md
+tests/host/out/
+tests/fixtures/
+tests/.venv/
+__pycache__/
+tests/.cache/
+tests/runs/
+tests/.machine/
