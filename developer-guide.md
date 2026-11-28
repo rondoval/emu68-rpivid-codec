@@ -1,4 +1,4 @@
-# emu68-rpivid-codec: developer guide
+# rpivid-codec: developer guide
 
 For programmers playing H.265 through `videocodec.library`, and for whoever
 works on the backend itself. Installing it is in [README.md](README.md); how
@@ -16,7 +16,7 @@ section 6 is troubleshooting.
 
 A program never opens `rpivid.codec`: it opens a decoder session on
 `videocodec.library` for `VCC_H265`, and the library picks the backend that
-offers it. Everything the vchiq library's developer guide says of sessions,
+offers it. Everything videocodec-library's developer guide says of sessions,
 packets, frames and pictures into a screen bitmap (its sections 2.1 and 2.2)
 holds for H.265 as for H.264; this section gives what differs.
 
@@ -38,9 +38,10 @@ s = VC_OpenSessionTags(VCA_Codec, VCC_H265, VCA_Kind, VCK_Decoder,
 * **`VCA_CodecTag`** may carry the container's FourCC (`hvc1`, `hev1`;
   `VC_CodecOfTag()` maps it to `VCC_H265`): `rpivid.codec`'s row serves
   every form of H.265, so it changes nothing here.
-* **On a machine without the block** (a Pi 3) `rpivid.codec` offers no
-  codec, and the open fails with `VCERR_NOBACKEND` (-3). A player can then
-  fall back to a decoder of its own before showing anything.
+* **On a machine without the block** (a Pi 3) `rpivid.codec` is installed
+  all the same but offers no codec, and the open fails with
+  `VCERR_NOBACKEND` (-3). A player can then fall back to a decoder of its own
+  before showing anything.
 
 ### 1.2 What the decoder takes
 
@@ -129,8 +130,9 @@ of its own, which only feeds the block. Two sessions share the block.
 
 ### 2.1 VCInfo and VCTest
 
-`VCInfo` lists `rpivid.codec` among the codec drivers with its counters, and
-`VCInfo CODECS` its row. The counters, also in `VCTest STATUS`:
+`VCInfo` lists `rpivid.codec` among the codec drivers and opens a session of
+its decoder, `VCInfo COUNTERS` shows its counters and `VCInfo CODECS` its row.
+The counters, also in `VCTest STATUS`:
 
 | Counter | Counts |
 |---|---|
@@ -144,7 +146,7 @@ of its own, which only feeds the block. Two sessions share the block.
 `Interface` reads `HEVC 0x202` (the block's version) while the hardware is
 up: from the first session until `videocodec.library`'s last close.
 
-`VCTest DECODE` (the vchiq library's developer guide, 6.3) takes H.265 by
+`VCTest DECODE` (videocodec-library's developer guide, 6.3) takes H.265 by
 the file's extension (`.h265`, `.hevc`, `.265`) or `ENCODING H265`.
 `OUTFORMAT NV12_COL128` takes the block's column frames as they are and
 hashes their visible window (section 4.1); `REF file` holds the hashes to a
@@ -160,17 +162,25 @@ of n bytes.
 
 ## 3. Building
 
-From the stack's root, through its container only:
+Kinora builds it, through its container only, from Kinora's root:
 
 ```sh
-./scripts/docker-build.sh --target emu68-rpivid-codec
+./build.sh                       # or scripts/docker-build.sh
 ```
 
-with the build directory's own configuration (`EMU68_CONFIGURE_ARGS`, or
-the script configures with its defaults), or `./build.sh --build` for the
-whole stack. The module goes to `install/LIBS/videocodec/rpivid.codec`; the
-`package` target puts it in the stack's archive. Zero warnings. The version
-is the one in `CMakeLists.txt`'s `project()`.
+Kinora's `scripts/docker-build.sh` builds emu68-common, then
+videocodec-library, then this repository (`build/rpivid-codec`), each into
+`build/video-prefix`, where this one finds `VideoCodec 0.7` (the backend ABI's
+headers) and `Emu68Common 2.3`; `gic400.library`'s headers come with the
+toolchain image (amiga-build-container). Configure knobs (the debug backend,
+the tier) go in `KINORA_CONFIGURE_ARGS`. The module goes to
+`build/video-prefix/LIBS/videocodec/rpivid.codec` and from there into
+Kinora's `install/` and archive. Zero warnings. The version is the one in
+`CMakeLists.txt`'s `project()`.
+
+The CI is Kinora's reusable workflow (`.github/workflows/versioning.yml`): a
+pull request must bump the version and add to `RELEASE-NOTES.md`, and builds
+inside Kinora with its source swapped in (`KINORA_RPIVID_SOURCE_DIR`).
 
 ---
 
@@ -196,7 +206,9 @@ whose reference FFmpeg dithers.
 `tests/fixtures/`, never in git:
 
 1. **The clips:** `tests/host/make-fixtures.sh` makes them with the host's
-   x265 from the vchiq suite's sample video, each with its `.framemd5` and
+   x265 from videocodec-library's suite's sample video (its
+   `tests/.cache/source/`, beside this repository in Kinora's `external/`),
+   each with its `.framemd5` and
    `.colmd5` from the host's FFmpeg: Main at 720p, 1080p and 4K, Main10 at
    1080p and 4K (the refusal past 1080p), a shape change, the extradata
    pair, the colour bars, and the players' MP4s, encoded straight into the
@@ -255,16 +267,20 @@ tests/run.sh --server=amiga-cm4 -m smoke    # after a change, about four minutes
 tests/run.sh --server=amiga-cm4             # before a release
 ```
 
-The suite runs on the stack's test harness, taken from the install tree
-(emu68-common's `emu68test` and the vchiq library's `vchiqtest`: build the
-stack first), so the vchiq suite's options apply: `--server`,
+The suite runs on the harness Kinora's build makes: emu68-common's
+`emu68test` (`build/emu68-prefix/share/emu68-testing`, or `$EMU68_TESTING`)
+and videocodec-library's `videocodectest`
+(`build/video-prefix/share/videocodec-testing`, or `$VIDEOCODEC_TESTING`):
+build Kinora first, its `install` target included. `tests/run.sh` passes
+`--build-dir=<kinora>/build/rpivid-codec` and `--install-dir=<kinora>/install`;
+a later one replaces them. The video suite's options apply: `--server`,
 `--install-dir`, `--no-install`, `--no-reboot`, `--serial`,
-`--update-baselines` and the rest. It installs the stack's resident files
-and this module from the install tree first and reboots; `RAM:hw` is its
-scratch. Its own options: `--kinora` (the Kinora program on the Amiga for
+`--update-baselines` and the rest. It installs the video libraries' resident
+files and this module from the install tree first and reboots; `RAM:hw` is
+its scratch. Its own options: `--kinora` (the Kinora program on the Amiga for
 `test_players.py`'s Kinora tests, by default where its Installer puts it; they
 skip without one) and `--archive`
-(the stack's `.lha` for `test_install`, by default the newest the `package`
+(Kinora's `.lha` for `test_install`, by default the newest its `package`
 target made; it must be of the installed build). Each run leaves
 `report.md`, `measured.json`, the debug log and every test's output under
 `tests/runs/`.
@@ -275,12 +291,12 @@ target made; it must be of the installed build). Each run leaves
 | `test_robust.py` | packets cut anywhere, the damaged streams, shape changes, low memory, bad parameter sets |
 | `test_conformance.py` | the conformance set (`slow`): every stream bit exact or refused as `LIST` says; the two `SAODBLK` streams `xfail` ([docs/hardware-facts.md](docs/hardware-facts.md)) |
 | `test_main10.py` | Main10 bit exact against the truncation, its counter, its rate, the refusal past 1080p |
-| `test_players.py` | Kinora playing 1080p and 4K in its window at the film's rate; VCPlay; `test_install`, the stack's archive through its Installer (`reboot`) |
+| `test_players.py` | Kinora playing 1080p and 4K in its window at the film's rate; VCPlay; `test_install`, Kinora's archive through its Installer, the video libraries with `rpivid.codec` (`reboot`) |
 
 Each test's docstring says what it checks. The markers: `smoke` (one of
 every path), `slow`, `reboot`, `hands` (an external reset, only with
 `--hands`). Every test runs on either machine; the PI4 runs the stock
-Kickstart and the stack's `gic400.library` from disk. `tests/run.sh gates`
+Kickstart and the driver stack's `gic400.library` from disk. `tests/run.sh gates`
 rewrites `tests/TRACEABILITY.md`: the backend's entry points, events and
 errors, each with the tests that cover it (their `covers` marks), or a
 known gap with its reason.
@@ -304,13 +320,13 @@ writes them, and the diff is read before a commit.
 | When | Runs |
 |---|---|
 | a change | `tests/run.sh gates` (kernel-doc, complexity, traceability: seconds, no machine) and `tests/host/run.sh`, then the smoke set on the CM4 |
-| a release | the same, then the whole suite with `slow` and `reboot` on the CM4 (and the PI4), under an hour, the conformance set most of it, the Kinora tests with Kinora installed; `test_install` after the `package` target, from that archive |
+| a release | the same, then the whole suite with `slow` and `reboot` on the CM4 (and the PI4), under an hour, the conformance set most of it, the Kinora tests with Kinora installed; `test_install` after Kinora's `package` target, from that archive |
 
 ### 4.7 What is not tested
 
 * Picture quality beyond bit exactness: there is none to judge, the block's
   output is the standard's.
-* The ISP's conversion itself: the vchiq library's suite covers it.
+* The ISP's conversion itself: videocodec-library's suite covers it.
 * Field-coded streams as fields: decoded as frames, checked bit exact as
   frames; nothing weaves them.
 * Real-time playback of 4K Main10: refused, so never attempted.
@@ -345,15 +361,16 @@ it.
 
 ### 5.2 The debug log
 
-On a build with the debug backend (the stack's `debug` tier), the module
+On a build with the debug backend (the `debug` tier, through
+`KINORA_CONFIGURE_ARGS`), the module
 writes `[rpivid]` lines to the Emu68 debug log: a session that failed and
 why, every dropped picture or slice and why, the block's version, a wedge.
 
 ### 5.3 Licence
 
 GPL-2.0 only: the command generator and the register map are Raspberry
-Pi's, from Linux. Code of the stack's BSD components may be used here;
-nothing of here goes back into them. [NOTICE](NOTICE) lists what comes from
+Pi's, from Linux. Code of the BSD-licensed emu68-common and
+videocodec-library may be used here; nothing of here goes back into them. [NOTICE](NOTICE) lists what comes from
 where.
 
 ---

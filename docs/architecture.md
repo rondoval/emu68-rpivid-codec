@@ -39,7 +39,7 @@ flowchart TD
 | Binary | Installed in | What it is |
 |---|---|---|
 | `rpivid.codec` | `LIBS:videocodec/` | The backend: one codec row, `VCC_H265` decoder, hardware priority. Reads the stream, keeps the reference pictures, drives the block, hands out frames in the block's column layout. |
-| The chain | `videocodec.library` (the vchiq library) | A converter session placed behind a decoder whose output the client cannot take (section 4). |
+| The chain | `videocodec.library` (videocodec-library) | A converter session placed behind a decoder whose output the client cannot take (section 4). |
 
 Each layer sees only the public header of the layer below. `rpivid.codec`
 is built against `libraries/videocodec_backend.h`, `emu68-common` and the
@@ -69,7 +69,7 @@ reaches a `gic400.library` server in under 150 us ([hardware-facts.md](hardware-
   motion vectors and writes the picture. Phase 1 of the next picture runs
   while phase 2 of this one does, so two pictures are in the block at once.
 * **It reaches all RAM** by 64-byte-granular addresses, so every buffer is
-  ordinary Fast RAM, cacheable, and the stack's DMA cache contract applies.
+  ordinary Fast RAM, cacheable, and emu68-common's DMA cache contract applies.
 * **It writes one layout:** 128-byte-wide columns, the luma rows then the
   interleaved chroma rows, 8-bit or 10-bit samples; the depth is the
   stream's, there is no 8-bit output for a Main10 stream. The VideoCore's
@@ -150,7 +150,7 @@ the stream layer builds on the host (section 12).
 |---|---|
 | The caller's | Every `VCB_*` call. A send parses the packet's NAL units, copies slice data into the picture's own bitstream buffer, and when a picture is complete builds its record and command list and queues it. A poll hands out what is ready, narrowing a Main10 picture to 8 bits first (section 10). The 68k's share of a picture is done here, in the player's own time: about 0.7 ms at 1080p, the library's calls included ([hardware-facts.md](hardware-facts.md)). |
 | The decode task | Only the block: starts phase 1 of the next queued picture when the entropy stage is free, phase 2 when the reconstruction stage is, reads each phase's result when its interrupt comes, grows a scratch buffer that ran out and reruns, retires a finished picture and signals its session's task. Never parses, never runs client code. |
-| The interrupt server | Reads and clears the block's interrupt register and signals the decode task. Assembly, answering with the Z flag as the stack's servers do. |
+| The interrupt server | Reads and clears the block's interrupt register and signals the decode task. Assembly, answering with the Z flag as the Emu68 drivers' servers do. |
 
 | Lock | Held for | Why |
 |---|---|---|
@@ -376,7 +376,7 @@ flowchart LR
   1080p picture on the VPU, not the 68k. With the block at about 3 ms and
   the 68k's parsing beside it, 1080p at 60 pictures/s has room.
 
-Everything of the chain is in the vchiq library (BSD), with the column pixel
+Everything of the chain is in videocodec-library (BSD), with the column pixel
 format it already carries; nothing of this repository goes there.
 
 ---
@@ -387,7 +387,7 @@ format it already carries; nothing of this repository goes there.
 
 `rpivid.codec` is an Exec library whose function table is
 `videocodec_backend.sfd`, built as `videocore.codec` is: freestanding C over
-`emu68-common`, the stack's module layout (the do-not-execute stub at
+`emu68-common`, its module layout (the do-not-execute stub at
 offset 0, the romtag next, no writable section) and LTO. Everything mutable
 lives in the library base: the session list and its lock, the DMA pool, the
 hardware layer's state, the reset guard, the counters.
@@ -456,7 +456,7 @@ backend ABI asks:
   shape is known to be 10 bits, and a stream that turns out Main10 under
   imported frames fails as a shape the client's frames do not fit.
 * **Remaking** at a new shape waits until the client has released every
-  frame of the old one, as the vchiq library promises; packets are never
+  frame of the old one, as videocodec.library promises; packets are never
   remade.
 
 ### 5.4 The calls
@@ -783,7 +783,7 @@ stay in the command generator.
 `WRITE_ONCE()` is where the byte order lives: the block reads the command
 list as little-endian 64-bit words (the address, then the data in the upper
 half), so the macro stores the value byte-swapped. The register accessors in
-`hevc_d_hw.h` go through the stack's MMIO helpers, which swap for the
+`hevc_d_hw.h` go through emu68-common's MMIO helpers, which swap for the
 registers. Nothing else in the kept code depends on byte order: the values
 it composes from bytes are values.
 
@@ -831,7 +831,7 @@ up" is Linux's step: the next 3 or 4 times a power of two.
 
 * **Up** (the first session): the DMA pool made if it is not there; the
   `hevc_dec` node's register ranges and interrupt from `devicetree.resource`;
-  the stack's claim on the block by that label, so no second driver takes
+  emu68-common's claim on the block by that label, so no second driver takes
   it; the clock switched on if it was off and set to the firmware's highest
   rate; the version register checked for `0x202`; the interrupt control
   register written as Linux writes it (the two activity enables, then a
@@ -1038,7 +1038,7 @@ developer guide's section 4 has the tests.
   stream the backend refuses by design is refused at its parameter set,
   before anything runs on the Amiga. Unit tests cover the bit reader, the
   scanner, the parameter sets, the RPS, the DPB and the record.
-* **The suite** is the vchiq library's kind: Python on the host driving
+* **The suite** is videocodec-library's kind, on its harness: Python on the host driving
   VCTest through the Amiga agent. VCTest decodes through the frontend with
   the native format out, and every picture of the clips and of the HEVC
   conformance set is hashed in the block's own column layout and compared
@@ -1054,7 +1054,7 @@ developer guide's section 4 has the tests.
 | Decision | Why |
 |---|---|
 | A backend of its own, not part of `videocore.codec` | the hardware is separate and so is the licence (section 14); the frontend was made for several backends |
-| The block driven from 68k code, not from Emu68 | the stack's "68k drivers over MMIO" architecture; nothing of ours in Emu68 |
+| The block driven from 68k code, not from Emu68 | the Emu68 drivers' "68k drivers over MMIO" architecture; nothing of ours in Emu68 |
 | Linux's command generator verbatim, our own plumbing around it | the only register documentation, kept diffable against upstream; the V4L2 queues, requests and interrupt callbacks around it are Linux's, not the hardware's |
 | The kept functions byte for byte, deviations marked | a reviewer sees exactly what differs from upstream |
 | The V4L2 HEVC control structures as the picture record | a stable published contract the command generator reads unchanged and FFmpeg fills on the host: each half testable alone |
@@ -1082,8 +1082,8 @@ developer guide's section 4 has the tests.
 
 The repository is **GPL-2.0 only**: Raspberry Pi's driver is the only
 description of the block, and its register file is GPL-2.0 only. Code flows
-one way: BSD code from the stack may be used here, nothing of here goes
-back, only hardware facts into the BSD documents.
+one way: BSD code from emu68-common and videocodec-library may be used here,
+nothing of here goes back, only hardware facts into the BSD documents.
 
 | Origin | Licence | Used as |
 |---|---|---|
@@ -1091,8 +1091,8 @@ back, only hardware facts into the BSD documents.
 | Linux `hevc_dec/hevc_d_hw.h` | GPL-2.0 | the register and bit names |
 | Linux `uapi/linux/v4l2-controls.h` | GPL-2.0+ with the syscall note, or BSD-3-Clause | the picture record |
 | `emu68-common` | MPL-2.0 or GPL-2.0+ | helpers, DMA memory, cache ops, the reset guard |
-| `emu68-gic400-library` | MPL-2.0 or GPL-2.0+ | the interrupt |
-| `emu68-vchiq-library` | BSD-3-Clause | the backend ABI headers |
+| `emu68-gic400-library` | MPL-2.0 or GPL-2.0+ | the interrupt (its headers, from the toolchain image) |
+| `videocodec-library` | BSD-3-Clause | the backend ABI headers |
 | ITU-T H.265 | the standard | what the parser implements |
 
 FFmpeg (LGPL-2.1-or-later) is the reference on the host; no code of it is in

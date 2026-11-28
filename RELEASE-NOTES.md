@@ -1,3 +1,18 @@
+# Release notes - rpivid-codec 0.6
+
+- **It comes with Kinora.** `rpivid.codec` now ships in
+  [Kinora](https://github.com/rondoval/kinora)'s archive, beside the video
+  libraries ([videocodec-library](https://github.com/rondoval/videocodec-library)),
+  and Kinora's Install script copies it to `LIBS:videocodec/` with them, with
+  the player or without it, on every machine. On a Pi 3, which has no HEVC
+  block, it offers no codec and an H.265 video fails to open; nothing else
+  changes. It needs `videocodec.library` 0.7.
+- Decoding is unchanged.
+- **For developers:** the repository is `rpivid-codec` now (it was
+  `emu68-rpivid-codec`), and builds inside Kinora.
+
+Version 0.5 shipped in the Emu68 driver stack, as `emu68-rpivid-codec`.
+
 # Release notes - emu68-rpivid-codec 0.5
 
 First release: 0.5. H.265 (HEVC) video on the Raspberry Pi 4's own HEVC block,

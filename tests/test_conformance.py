@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pytest
-from vchiqtest.tools import assert_nothing_left, status, vctest
+from videocodectest.tools import assert_nothing_left, status, vctest
 
 LIST = Path(__file__).resolve().parent / "conformance" / "LIST"  # checked in, with the references beside it
 NATIVE = "OUTFORMAT NV12_COL128"

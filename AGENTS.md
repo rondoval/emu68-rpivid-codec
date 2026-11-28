@@ -1,13 +1,14 @@
-# emu68-rpivid-codec
+# rpivid-codec
 
-An H.265 backend of `videocodec.library` on the Pi 4's HEVC block. The
-stack-wide rules in the superbuild's `AGENTS.md` apply (container builds only,
-`__NOLIBBASE__` with a local `SysBase` in freestanding code, C99 declarations
-at first use, zero warnings, the user owns git).
+An H.265 backend of `videocodec.library` on the Pi 4's HEVC block, built and
+shipped by Kinora (its submodule `external/rpivid-codec`). Kinora's `AGENTS.md`
+rules apply (container builds only, zero warnings, the user owns git), and the
+Emu68 drivers' habits: `__NOLIBBASE__` with a local `SysBase` in freestanding
+code, C99 declarations at first use.
 
 | Binary | Source | Installed in | What it is |
 |---|---|---|---|
-| `rpivid.codec` | `src/` | `LIBS:videocodec/` (the Install script, with videocodec) | the backend: stream layer, command generator, hardware layer, session layer |
+| `rpivid.codec` | `src/` | `LIBS:videocodec/` (Kinora's Install script, with the video libraries) | the backend: stream layer, command generator, hardware layer, session layer |
 
 ## Layers
 
@@ -15,7 +16,7 @@ at first use, zero warnings, the user owns git).
 |---|---|---|
 | `src/stream/` | NAL scanner, bit reader, parameter sets, slice headers, RPS, DPB, the picture record | C and its own headers only: it builds on the host (`tests/host/`) |
 | `src/cmdgen/` | the command generator: `hevc_d_h265.c` kept from Linux, `cmdgen.c` the plumbing, `linux_compat.h` the kernel's names | emu68-common, its own headers |
-| `src/hw/` | the block: claim, clock, interrupt server, decode task | emu68-common, gic400, mailbox |
+| `src/hw/` | the block: claim, clock, interrupt server, decode task | emu68-common, gic400 and mailbox (their headers from the toolchain image) |
 | `src/narrow/` | the Main10 pass, `narrow_picture()` | nothing |
 | `src/session*.c`, `src/rpivid_*.c` | sessions, packets, frames, the backend ABI | all of the above |
 
@@ -34,10 +35,11 @@ Each document has one reader; put new text where its reader looks.
 
 ## Build and validate
 
-From the stack root, `./scripts/docker-build.sh --target emu68-rpivid-codec`
-with the build cache's own values (`EMU68_CONFIGURE_ARGS`, or the build
-reconfigures with the script's defaults), or `./build.sh --build`. Zero
-warnings.
+From Kinora's root, `./build.sh` (or `scripts/docker-build.sh`): it builds
+emu68-common, then videocodec-library, then this repository
+(`build/rpivid-codec`) into `build/video-prefix`, where it finds `VideoCodec
+0.7` and `Emu68Common 2.3`; then Kinora. Debug knobs go in
+`KINORA_CONFIGURE_ARGS`. Zero warnings.
 
 From the component root:
 
@@ -56,18 +58,20 @@ From the component root:
     backend's entry points, events and errors with the tests that cover
     them, or as known gaps in `tests/gates/trace_items.py`.
 - **On the hardware:** `tests/run.sh --server=amiga-cm4` (emu68-common's
-  harness and the vchiq library's `vchiqtest`, both from the stack's install
-  tree: never from a sibling's source), `-m smoke` after a change, the whole
-  suite before a release. The machines are shared:
-  the user runs these or says when to, and another session may hold a
-  machine or the build tree. The suite installs the stack's resident files
-  and reboots; report what it replaced and whether `baselines.json` changed.
+  harness and videocodec-library's `videocodectest`, both from Kinora's build:
+  `build/emu68-prefix/share/emu68-testing` and
+  `build/video-prefix/share/videocodec-testing`, never from a sibling's
+  source), `-m smoke` after a change, the whole suite before a release. The
+  machines are shared: the user runs these or says when to, and another
+  session may hold a machine or the build tree. The suite installs the video
+  libraries' resident files from Kinora's `install/` and reboots; report what
+  it replaced and whether `baselines.json` changed.
 
 ## Rules
 
-1. **GPL-2.0 only.** Code flows one way: BSD code of the stack may be used
-   here, nothing of here goes back, only hardware facts into the vchiq
-   library's documents.
+1. **GPL-2.0 only.** Code flows one way: BSD code of emu68-common and
+   videocodec-library may be used here, nothing of here goes back, only
+   hardware facts into videocodec-library's documents.
 2. **The kept file stays verbatim.** `src/cmdgen/hevc_d_h265.c` is Linux's
    with the V4L2 framework's functions replaced; every other change is marked
    `rpivid:` and explained (one today: the scaling factors written for every
@@ -76,7 +80,7 @@ From the component root:
    commit and blob.
 3. **`src/stream/` is never on the m68k include path:** its `bits.h` would
    shadow emu68-common's. The module includes `stream/x.h` from `src/`.
-4. **The backend ABI is the vchiq library's.** `rpivid.codec` implements
+4. **The backend ABI is videocodec-library's.** `rpivid.codec` implements
    `videocodec_backend.sfd` as the library's headers give it (ABI 1.1,
    `VCB_OutputFrame()`); a change there is the library's first.
 5. **What the block or the ISP reads stays within their reach:** buffers from
@@ -98,11 +102,12 @@ From the component root:
   and `__u32` are built on them.
 - A long suite run's serial capture can stop partway: for the backend's own
   messages about one stream, rerun it with a capture of your own.
-- The root `build.sh` defaults to the debug tier and stamps a dev build; say
-  which tier a measurement came from.
-- `test_install` holds the archive to the install tree: an `--install-dir`
-  trimmed to `rpivid.codec` and the rigs fails it with `FileNotFoundError`.
-  For the whole suite give the stack's full install tree, or deselect it.
+- Kinora's `build.sh` stamps a dev build, and the tier is what
+  `KINORA_CONFIGURE_ARGS` says; say which tier a measurement came from.
+- `test_install` holds Kinora's archive to the install tree: an
+  `--install-dir` trimmed to `rpivid.codec` and the rigs fails it with
+  `FileNotFoundError`. For the whole suite give Kinora's full install tree, or
+  deselect it.
 - `test_cpu` reads Executive's totals, which every other task on the machine
   moves: on a failure, rerun it alone on a quiet machine before a change is
   blamed.

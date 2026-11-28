@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 """Main10 through VCTest DECODE (developer-guide.md section 4.4): the narrowed frames bit exact against the host's truncation, the rate with the pass, the refusal past 1080p."""
 import pytest
-from vchiqtest.tools import assert_nothing_left, backend, status, vctest
+from videocodectest.tools import assert_nothing_left, backend, status, vctest
 
 NATIVE = "OUTFORMAT NV12_COL128"
 

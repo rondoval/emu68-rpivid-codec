@@ -1,7 +1,7 @@
 # Hardware facts
 
 What the hardware really does, measured; each fact with where it comes from.
-Facts about the VideoCore's ISP also go to the vchiq library's
+Facts about the VideoCore's ISP also go to videocodec-library's
 `docs/firmware-facts.md`, which is where videocore.codec's readers look.
 
 Measured on the CM4 under Emu68 1.1 unless said. Some facts were measured
@@ -34,7 +34,7 @@ A register probe, run from `RAM:` with no serial log.
   the write (polled at 100 us steps: the latency is less); the server's
   write-back with the test bit off and the source bits written 1 leaves the
   register as found and nothing pending. The server is in assembly and
-  answers with the Z flag, as the stack's servers do; `A1 = is_Data`,
+  answers with the Z flag, as the Emu68 drivers' servers do; `A1 = is_Data`,
   `A6 = SysBase` from gic400's dispatcher.
 
 So interrupts, not polling, for the backend; the block and its clock need no
@@ -108,14 +108,15 @@ with ffmpeg's conversion of the same charts.
 * **Full range, whatever the content, unless the ISP gets a matrix.** Left
   to itself the ISP makes a limited-range chart (16 to 235) come out with 16
   as RGB 16 and 235 as RGB 236; the full-range chart matches to 50.6 dB. The
-  same holds for every other YUV input of the ISP. The vchiq library's
-  converter corrects it with the ISP's custom matrix, applied to the samples
+  same holds for every other YUV input of the ISP. The converter of
+  videocodec-library corrects it with the ISP's custom matrix, applied to the samples
   before that one conversion (its firmware-facts.md, "The ISP's colours"): it
   needs the stream's colour space, which this backend reports in its stream
   information and the frontend's chain passes on.
 * **10-bit columns (`Y10C`) are not taken.** The ISP's input lists 48
-  encodings and `Y10C` is not one of them; `SAND` is. (`VCInfo COMPONENTS`
-  shows the input's list as "none given": it asks differently.) So Main10
+  encodings and `Y10C` is not one of them; `SAND` is. (`VCInfo COMPONENTS`,
+  a firmware survey since removed, showed the input's list as "none given":
+  it asked differently.) So Main10
   cannot be shown through the ISP. Linux agrees: its ISP driver carries the
   8-bit column format only, and its 10-bit HEVC pictures go to the display
   hardware or through software.
@@ -240,7 +241,8 @@ reference, the five refusals), the session's tests, 342.8 pictures/s at
 
 ## The archive
 
-* **The stack's Installer**, EXPERT mode, videocodec alone ticked, on a
+* **The driver stack's Installer**, which shipped `rpivid.codec` up to 0.5,
+  EXPERT mode, videocodec alone ticked, on a
   machine whose `rpivid.codec` was deleted: it copies `rpivid.codec`,
   `gic400.library`, `VCInfo` and `VCGrab` (the rest of videocodec was the
   same build and is left), and after a reboot the backend offers its codec

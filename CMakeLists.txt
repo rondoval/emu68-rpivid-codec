@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.14)
-project(emu68-rpivid-codec VERSION 0.5 LANGUAGES C ASM)
+project(rpivid-codec VERSION 0.6 LANGUAGES C ASM)
 # The one version of the repository: every binary takes it.  Bump it here only.
 
 # rpivid.codec: an H.265 backend of videocodec.library on the Raspberry Pi 4's
-# HEVC block (docs/).  A component of the emu68 driver stack, which builds it
-# with its toolchain and installs it into the shared prefix where the packages
-# below come from.
+# HEVC block (docs/).  Kinora builds and ships it: its superbuild builds it with
+# its toolchain after emu68-common and videocodec-library, into the prefix where
+# the packages below come from.
 #
 #   src/, include/   rpivid.codec (LIBS:videocodec/): docs/architecture.md section 3.1 names the files
 #   tests/           its test suite (developer-guide.md section 4), on the host and on the Amiga
@@ -15,13 +15,12 @@ if(EMU68_BUILD_STAMP)
     string(APPEND CURRENT_DATE " ${EMU68_BUILD_STAMP}")
 endif()
 
-# Dependencies, all from the stack's install prefix: emu68-common (devtree, MMIO,
-# timing, dma_mem, the driver task, cache ops), gic400.library's protos (the
-# block's interrupt), and the vchiq library's VideoCodec package (the backend ABI
-# headers).
+# Dependencies, from the superbuild's prefix: emu68-common (devtree, MMIO, timing,
+# dma_mem, the driver task, cache ops) and videocodec-library's VideoCodec package
+# (the backend ABI headers).  gic400.library's protos (the block's interrupt) come
+# with the toolchain image (amiga-build-container).
 find_package(Emu68Common 2.3 CONFIG REQUIRED)
-find_package(GIC400 1.3 CONFIG REQUIRED)
-find_package(VideoCodec 0.6 CONFIG REQUIRED) # 0.6: vchiqtest, the suite's harness, in the install tree
+find_package(VideoCodec 0.7 CONFIG REQUIRED) # 0.7: videocodectest, the suite's harness, in the install tree
 
 option(EMU68_LTO "Link-time optimization for the backend module" ON)
 

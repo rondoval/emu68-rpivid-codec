@@ -1,5 +1,5 @@
-emu68-rpivid-codec - notices
-============================
+rpivid-codec - notices
+======================
 
 rpivid.codec is licensed under the GNU General Public License, version 2
 only (LICENSE). It contains code from the works below; each part keeps its
@@ -72,17 +72,17 @@ option:
     SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-3. The driver stack's own parts
+3. The driver stack's parts it builds on
 -------------------------------
 
-Each ships its LICENSE in the archive's Documentation/<name>/ drawer.
+Each ships its licence beside this one in the archive.
 
 - emu68-common (MPL-2.0 OR GPL-2.0-or-later): helpers, DMA memory, cache
   operations, the driver task and the reset guard, linked into every
   binary.
 - emu68-gic400-library (MPL-2.0 OR GPL-2.0-or-later): gic400.library's
   interface, through which the interrupt is served.
-- emu68-vchiq-library (BSD-3-Clause): the backend interface of
+- videocodec-library (BSD-3-Clause): the backend interface of
   videocodec.library that rpivid.codec implements.
 
 
